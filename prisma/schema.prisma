@@ -1,0 +1,315 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum SubscriptionPlan {
+  STARTER     // 29 990 Ft / hó (max 200 munka, 300 megkeresés, 1 fiók, 30 AI kredit)
+  BUSINESS    // 49 990 Ft / hó (max 1000 munka, 1500 megkeresés, 5 fiók, 100 AI kredit)
+  ENTERPRISE  // Egyedi (korlátlan, API, online fizetés)
+}
+
+enum BillingCycle {
+  MONTHLY
+  YEARLY
+}
+
+enum ServiceCategory {
+  RUG_CLEANING        // Szőnyegtisztítás
+  CAR_DETAILING       // Autókozmetika
+  UPHOLSTERY_CLEANING // Kárpittisztítás
+  COMBINED            // Több kategória (Enterprise)
+}
+
+enum UserRole {
+  OWNER
+  ADMIN
+  DISPATCHER
+  DRIVER
+  CLEANER
+}
+
+enum JobStatus {
+  WAITING_PICKUP  // Felvételre vár
+  RECEIVED        // Beérkezett
+  IN_PROGRESS     // Tisztítás alatt
+  COMPLETED       // Elkészült (kiszállításra vár)
+  DELIVERED       // Kiszállítva / Lezárt
+  ARCHIVED        // Archivált
+}
+
+enum PickupMode {
+  QUICK_COUNT     // Gyors darabszámos átvétel (mérés a műhelyben)
+  FIELD_MEASURED  // Helyszíni pontos mérés & kalkuláció
+}
+
+enum PaymentMethod {
+  CASH
+  CARD_POS
+  TRANSFER
+  ONLINE
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+}
+
+enum InquiryStatus {
+  NEW
+  OFFER_SENT
+  CONVERTED
+  DECLINED
+  ARCHIVED
+}
+
+model Tenant {
+  id                String            @id @default(cuid())
+  name              String            // Cég neve (pl. Kristály Szőnyeg Kft.)
+  slug              String            @unique // pl. kristaly
+  plan              SubscriptionPlan  @default(STARTER)
+  billingCycle      BillingCycle      @default(MONTHLY)
+  serviceCategory   ServiceCategory   @default(RUG_CLEANING)
+  
+  // Limitek
+  maxMonthlyJobs    Int               @default(200)
+  maxMonthlyLeads   Int               @default(300)
+  maxSeats          Int               @default(1)
+  
+  // AI Wallet
+  aiCredits         Int               @default(30)
+  autoAiResponse    Boolean           @default(false) // Automata AI válaszküldés bekapcsolva-e
+  
+  // Céges elérhetőség & Branding
+  logoUrl           String?
+  phone             String?
+  email             String?
+  address           String?
+  taxNumber         String?           // Adószám
+  bankAccount       String?           // Bankszámlaszám
+  
+  // Értékelésgyűjtés linkek
+  googleReviewUrl   String?
+  facebookReviewUrl String?
+  
+  // Számlázási beállítások
+  invoiceProvider   String            @default("MANUAL") // MANUAL | SZAMLAZZ | BILLINGO
+  invoiceApiKey     String?
+  invoiceAutoIssue  Boolean           @default(false)
+  
+  // Sofőr nézet beállítás
+  driverSeeAllJobs  Boolean           @default(false) // Ha false, csak a hozzárendelt címeket látja
+  
+  // Kapcsolatok
+  users             User[]
+  customers         Customer[]
+  inquiries         Inquiry[]
+  jobs              Job[]
+  priceRules        PriceRule[]
+  aiTransactions    AiTransaction[]
+
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+}
+
+model User {
+  id              String        @id @default(cuid())
+  tenantId        String
+  tenant          Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  
+  clerkUserId     String        @unique // Clerk Auth azonosító
+  email           String
+  name            String
+  phone           String?
+  role            UserRole      @default(OWNER)
+  isActive        Boolean       @default(true)
+  
+  assignedJobs    Job[]         @relation("AssignedDriver")
+  aiTransactions  AiTransaction[]
+
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@index([tenantId])
+}
+
+model Customer {
+  id              String        @id @default(cuid())
+  tenantId        String
+  tenant          Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  
+  name            String
+  email           String?
+  phone           String
+  address         String
+  city            String        @default("Budapest")
+  zip             String?
+  doorBell        String?
+  notes           String?
+  
+  inquiries       Inquiry[]
+  jobs            Job[]
+
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@index([tenantId])
+}
+
+model Inquiry {
+  id                String        @id @default(cuid())
+  tenantId          String
+  tenant            Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  
+  customerId        String?
+  customer          Customer?     @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  
+  source            String        @default("WEB_WIDGET") // WEB_WIDGET | EMAIL | PHONE | MANUAL
+  status            InquiryStatus @default(NEW)
+  
+  customerName      String
+  customerEmail     String?
+  customerPhone     String
+  customerAddress   String
+  customerNotes     String?
+  preferredDate     DateTime?
+  
+  estimatedAmount   Int?          // Becsült összeg Ft-ban
+  aiSummary         String?       // AI által kinyert méretek és összefoglaló
+  aiDraftReply      String?       // AI által előkészített válaszlevél
+  
+  convertedToJobId  String?       @unique
+
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  @@index([tenantId])
+}
+
+model Job {
+  id                  String        @id @default(cuid())
+  tenantId            String
+  tenant              Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  
+  jobCode             String        // pl. "CF-2026-0001"
+  status              JobStatus     @default(WAITING_PICKUP)
+  pickupMode          PickupMode    @default(QUICK_COUNT)
+  
+  customerId          String
+  customer            Customer      @relation(fields: [customerId], references: [id])
+  
+  assignedDriverId    String?
+  assignedDriver      User?         @relation("AssignedDriver", fields: [assignedDriverId], references: [id], onDelete: SetNull)
+  
+  // Gyors darabszámos átvétel adatai
+  quickRugCount       Int?          @default(0)
+  
+  // Dátumok & Ütemezés
+  scheduledPickup     DateTime?
+  scheduledDelivery   DateTime?
+  actualPickup        DateTime?
+  actualDelivery      DateTime?
+  
+  // Pénzügyek
+  totalAmount         Int           @default(0) // Bruttó végösszeg Ft-ban
+  paymentMethod       PaymentMethod @default(CASH)
+  paymentStatus       PaymentStatus @default(PENDING)
+  
+  // Bizonylatolás és Aláírás
+  trackingToken       String        @unique // SHA-256 / nano token az ügyfélkövetéshez
+  customerSignature   String?       // Base64 vagy R2 URL
+  signedAt            DateTime?
+  receiptPdfUrl       String?       // R2 PDF tárolt URL
+  invoiceNumber       String?       // Számla sorszáma
+  invoicePdfUrl       String?       // Csatolt számla PDF
+  
+  // Jegyzetek
+  customerNotes       String?
+  internalNotes       String?
+  
+  // Tételek
+  items               JobItem[]
+
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+
+  @@index([tenantId])
+  @@index([status])
+  @@index([trackingToken])
+}
+
+model JobItem {
+  id                String        @id @default(cuid())
+  jobId             String
+  job               Job           @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  
+  itemCategory      String        @default("RUG") // RUG | DETAILING | UPHOLSTERY
+  name              String        // pl. "Normál perzsa szőnyeg" vagy "Prémium belső kozmetika"
+  
+  // Szőnyeg méretek & kalkuláció
+  width             Float?        // Méter pl. 2.0
+  length            Float?        // Méter pl. 3.0
+  area              Float?        // m2 pl. 6.0
+  pricePerUnit      Int           @default(0) // Alap Ft/m2 vagy fix csomagár
+  
+  // Szennyezettségi felár
+  isHeavySoiling    Boolean       @default(false)
+  heavySoilingFee   Int           @default(0) // Felár Ft-ban
+  
+  // Extrák (pl. Atkamentesítés, Ózon, Szegés)
+  extras            String[]      @default([])
+  extrasFee         Int           @default(0)
+  
+  // Tétel végösszeg
+  totalPrice        Int           @default(0)
+  
+  // Vízálló műhelyi címke / QR kód
+  tagQrCode         String?       @unique // Biléta egyedi azonosító
+  
+  // Fotók (előtte/utána foltok)
+  photos            String[]      @default([]) // R2 URL-ek
+  notes             String?
+
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  @@index([jobId])
+}
+
+model PriceRule {
+  id                String        @id @default(cuid())
+  tenantId          String
+  tenant            Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  
+  category          String        // RUG_TYPE | EXTRA | DETAILING_PKG | VEHICLE_CLASS
+  name              String        // pl. "Shaggy szőnyeg", "Atkamentesítés", "SUV felár"
+  unitPrice         Int           // Ft/m2 vagy fix Ft
+  description       String?
+  isActive          Boolean       @default(true)
+
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  @@index([tenantId])
+}
+
+model AiTransaction {
+  id                String        @id @default(cuid())
+  tenantId          String
+  tenant            Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  
+  userId            String?
+  user              User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+  
+  actionType        String        // INQUIRY_ANALYSIS | EMAIL_DRAFT | DAILY_SUMMARY | TOP_UP
+  creditsChanged    Int           // Negatív ha költés (-1, -2), pozitív ha feltöltés (+250)
+  description       String
+  
+  createdAt         DateTime      @default(now())
+
+  @@index([tenantId])
+}

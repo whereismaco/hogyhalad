@@ -1,33 +1,63 @@
 {
-  "name": "szonyegtisztito-crm",
+  "name": "hogyhalad",
   "version": "0.1.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint",
-    "postinstall": "prisma skills sync || exit 0"
+    "lint": "eslint --max-warnings=0",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "db:migrate": "wrangler d1 migrations apply DB --local",
+    "db:seed": "wrangler d1 execute DB --local --file seeds/development.sql",
+    "preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
+    "build:cloudflare": "opennextjs-cloudflare build",
+    "deploy:staging": "opennextjs-cloudflare build && opennextjs-cloudflare deploy --env staging",
+    "deploy:production": "opennextjs-cloudflare build && opennextjs-cloudflare deploy --env production",
+    "worker:dev": "wrangler dev --config wrangler.background.jsonc",
+    "check:release": "node scripts/check-release.mjs",
+    "test:e2e": "node scripts/e2e-setup.mjs && playwright test",
+    "dev:setup": "node scripts/dev-setup.mjs",
+    "verify": "npm run lint && npm run typecheck && npm test"
   },
   "dependencies": {
-    "@prisma/client": "^7.10.0",
+    "@better-auth/drizzle-adapter": "1.7.10",
+    "@opennextjs/cloudflare": "1.20.12",
+    "@pdf-lib/fontkit": "1.1.1",
+    "better-auth": "1.7.10",
     "clsx": "^2.1.1",
+    "decimal.js": "10.6.0",
+    "drizzle-orm": "0.45.4",
+    "fast-xml-parser": "5.11.2",
     "lucide-react": "^1.46.0",
-    "next": "16.3.5",
+    "next": "16.4.2",
+    "pdf-lib": "1.17.1",
+    "qrcode": "1.5.4",
     "react": "19.2.8",
     "react-dom": "19.2.8",
+    "stripe": "23.0.0",
+    "svix": "2.8.0",
     "tailwind-merge": "^3.7.0",
     "zod": "^4.6.5"
   },
   "devDependencies": {
+    "@cloudflare/workers-types": "5.20261016.1",
+    "@playwright/test": "1.64.1",
     "@tailwindcss/postcss": "^4",
-    "@types/node": "^20",
+    "@types/node": "24.19.2",
+    "@types/qrcode": "1.5.6",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
-    "eslint-config-next": "16.3.5",
-    "prisma": "^8.0.0-rc.15",
+    "eslint-config-next": "16.4.2",
+    "prettier": "3.9.10",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "5.0.5",
+    "wrangler": "4.151.1"
+  },
+  "overrides": {
+    "glob": "10.5.0"
   }
 }

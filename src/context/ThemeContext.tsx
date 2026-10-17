@@ -1,54 +1,57 @@
 "use client";
-
-import React, { createContext, useContext, useEffect, useState } from "react";
-
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useSyncExternalStore,
+  type ReactNode,
+} from "react";
 type Theme = "light" | "dark";
-
-interface ThemeContextType {
+const ThemeContext = createContext<{
   theme: Theme;
   toggleTheme: () => void;
-}
-
-const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
-
-export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setTheme] = useState<Theme>("light");
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    // Alapértelmezett téma: localStorage vagy rendszer preference
-    const savedTheme = localStorage.getItem("cleanflow-theme") as Theme | null;
-    if (savedTheme) {
-      setTheme(savedTheme);
-      document.documentElement.classList.toggle("dark", savedTheme === "dark");
-    } else if (window.matchMedia("(prefers-color-scheme: dark)").matches) {
-      // Ha a rendszer preferenciája sötét, de a user kérése szerint:
-      // "alapból világos témájú, de lehessen sötét módra is kapcsolni"
-      // Tehát alapértelmezetten light marad, kivéve ha a user explicitly átkapcsolja
-      setTheme("light");
-      document.documentElement.classList.remove("dark");
-    }
-    setMounted(true);
-  }, []);
-
-  const toggleTheme = () => {
-    const nextTheme = theme === "light" ? "dark" : "light";
-    setTheme(nextTheme);
-    localStorage.setItem("cleanflow-theme", nextTheme);
-    document.documentElement.classList.toggle("dark", nextTheme === "dark");
+} | null>(null);
+function subscribe(callback: () => void) {
+  window.addEventListener("hh-theme", callback);
+  window.addEventListener("storage", callback);
+  return () => {
+    window.removeEventListener("hh-theme", callback);
+    window.removeEventListener("storage", callback);
   };
-
+}
+function read(): Theme {
+  try {
+    return localStorage.getItem("hogyhalad-theme") === "dark"
+      ? "dark"
+      : "light";
+  } catch {
+    return "light";
+  }
+}
+export function ThemeProvider({ children }: { children: ReactNode }) {
+  const theme = useSyncExternalStore(subscribe, read, () => "light" as Theme);
+  useEffect(() => {
+    document.documentElement.classList.toggle("dark", theme === "dark");
+  }, [theme]);
+  const toggleTheme = () => {
+    try {
+      localStorage.setItem(
+        "hogyhalad-theme",
+        theme === "light" ? "dark" : "light",
+      );
+      window.dispatchEvent(new Event("hh-theme"));
+    } catch {
+      /* Storage disabled: the current page remains usable. */
+    }
+  };
   return (
     <ThemeContext.Provider value={{ theme, toggleTheme }}>
       {children}
     </ThemeContext.Provider>
   );
 }
-
 export function useTheme() {
-  const context = useContext(ThemeContext);
-  if (!context) {
-    throw new Error("useTheme must be used within a ThemeProvider");
-  }
-  return context;
+  const value = useContext(ThemeContext);
+  if (!value) throw new Error("ThemeProvider szükséges.");
+  return value;
 }

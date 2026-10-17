@@ -12,6 +12,11 @@
 
 # testing
 /coverage
+/.wrangler/
+/.open-next/
+.dev.vars*
+/test-results/
+/playwright-report/
 
 # next.js
 /.next/

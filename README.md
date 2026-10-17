@@ -1,36 +1,64 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# HogyHalad
 
-## Getting Started
+Több céget kiszolgáló szolgáltatói CRM: ügyfelek, megkeresések, munkafolyamatok, követőoldal, mobilos átadás, előfizetés és integrációk.
 
-First, run the development server:
+## Technológia
 
-```bash
+Next.js 16.4.2 / React 19, Cloudflare Workers + OpenNext 1.20.12, D1 + Drizzle, privát R2, Better Auth, Stripe, Resend, OpenAI. A háttérfeladatokat külön Worker és Queue dolgozza fel.
+
+## Helyi indítás
+
+Node.js 24 szükséges. A projektben rögzített csomagverziókat használd.
+
+```sh
+npm ci
+node scripts/dev-setup.mjs
+npm run db:migrate
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+A fejlesztői alkalmazás címe http://localhost:3000. A titkok helye a Gitből kizárt .dev.vars. A .env.example referencialista; az alkalmazás a Worker-bindingokat használja, a régi .env.local Clerk/Neon-beállításai már nem használatosak. A setup megőrzi a meglévő .dev.vars fájlt.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+A Next fejlesztői bindingjai a wrangler.dev.jsonc fájlból érkeznek. Ez ugyanazt a helyi D1/R2 állapotot használja, de nem nyitja meg a buildelt assets mappát, így a fejlesztői szerver nem zárolja az OpenNext kimenetét.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+A valódi magic linkhez Resend, a Google-belépéshez OAuth-beállítás szükséges. Nincs fejlesztői belépési kiskapu. A tesztek kizárólag helyi D1-ben hoznak létre külön tesztmunkameneteket.
 
-## Learn More
+Opcionális helyi mintaadatok: npm run db:seed. Éles adatbázisba soha ne töltsd fel a seeds könyvtár tartalmát.
 
-To learn more about Next.js, take a look at the following resources:
+## Háttérfeldolgozás helyben
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Külön terminálban:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```sh
+npm run worker:dev -- --test-scheduled --port 8788
+```
 
-## Deploy on Vercel
+A helyi ütemező meghívása: http://localhost:8788/__scheduled. Az outbox sorait a Queue fogyasztó dolgozza fel. A két Worker azonos helyi D1/R2 állapotot használ. A háttérworker APP_URL-je a futó webalkalmazás címe legyen; innen tölti a PDF-hez mellékelt, SIL OFL licencű Noto Sans betűtípust.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Ellenőrzések
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```sh
+npm run lint
+npm run typecheck
+npm test
+npm run build:cloudflare
+npm run test:e2e
+```
+
+Az E2E a valódi helyi Worker-futtatást használja a 8787-es porton. Windows alatt a telepített Chrome-ot; Linux alatt előbb: npx playwright install --with-deps chromium. A helyi tesztmunkamenetek és nyomkövetési fájlok a Gitből kizárt .wrangler és test-results könyvtárakban maradnak.
+
+## Csomagok
+
+Starter: 29 990 Ft/hó; 200 munka, 300 megkeresés, 1 felhasználó, 30 AI-kredit.
+Business: 49 990 Ft/hó; 1000 munka, 1500 megkeresés, 5 felhasználó, 100 AI-kredit, csapatmunka, beágyazás, követési API, Számlázz.hu/Billingo.
+
+A havidíjak fizetendő végösszegek. Hétnapos próba kötelező kártyamegadással; automatikus megújulás, Stripe Portalból lemondás. Csomagváltás a következő időszaktól. A munkadíjakat a HogyHalad Stripe-fiókja nem szedi be.
+
+## Dokumentáció
+
+- docs/deployment.md — Cloudflare-erőforrások, titkok, kiadás és visszaállítás
+- docs/integration.md — Business API, beágyazás, Node.js és PHP példa
+- docs/operations.md — jogosultságok, háttérfeladatok, számlázási hibák és adatkezelés
+- docs/verification.md — ellenőrzések és a külső hozzáféréssel végzendő indulási tesztek
+
+A tényleges külső fizetés, levélkézbesítés, OAuth-visszahívás és NAV-os számlázás igazolásához a saját szolgáltatói tesztfiókok szükségesek. A konfigurációs ellenőrzés szándékosan blokkolja a hiányos élesítést.

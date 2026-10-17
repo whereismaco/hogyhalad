@@ -1,0 +1,2 @@
+ALTER TABLE files ADD COLUMN taskId TEXT;
+CREATE UNIQUE INDEX file_task ON files(taskId) WHERE taskId IS NOT NULL;

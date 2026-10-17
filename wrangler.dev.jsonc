@@ -1,0 +1,35 @@
+{
+  "name": "hogyhalad-development-bindings",
+  "main": "workers/dev.ts",
+  "compatibility_date": "2026-10-17",
+  "compatibility_flags": ["nodejs_compat"],
+  "vars": {
+    "APP_URL": "http://localhost:3000",
+    "ENVIRONMENT": "development",
+    "EMAIL_DOMAIN": "hogyhalad.hu",
+    "AUTH_FROM": "HogyHalad <belepes@hogyhalad.hu>",
+    "OPENAI_MODEL": "gpt-6-luna"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "hogyhalad-development",
+      "database_id": "00000000-0000-0000-0000-000000000001",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "FILES",
+      "bucket_name": "hogyhalad-development-files"
+    }
+  ],
+  "queues": {
+    "producers": [
+      {
+        "binding": "TASKS",
+        "queue": "hogyhalad-development-tasks"
+      }
+    ]
+  }
+}

@@ -1,0 +1,1 @@
+ALTER TABLE jobEvents ADD COLUMN internalReason TEXT NOT NULL DEFAULT '';

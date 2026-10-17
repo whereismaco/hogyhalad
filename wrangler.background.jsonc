@@ -1,0 +1,138 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "hogyhalad-background-development",
+  "main": "workers/background.ts",
+  "compatibility_date": "2026-10-17",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": {
+    "enabled": true
+  },
+  "vars": {
+    "APP_URL": "http://localhost:3000",
+    "ENVIRONMENT": "development",
+    "EMAIL_DOMAIN": "hogyhalad.hu",
+    "AUTH_FROM": "HogyHalad <belepes@hogyhalad.hu>",
+    "OPENAI_MODEL": "gpt-6-luna"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "hogyhalad-development",
+      "database_id": "00000000-0000-0000-0000-000000000001",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "FILES",
+      "bucket_name": "hogyhalad-development-files"
+    }
+  ],
+  "queues": {
+    "producers": [
+      {
+        "binding": "TASKS",
+        "queue": "hogyhalad-development-tasks"
+      }
+    ],
+    "consumers": [
+      {
+        "queue": "hogyhalad-development-tasks",
+        "max_batch_size": 5,
+        "max_retries": 3,
+        "dead_letter_queue": "hogyhalad-development-dlq"
+      }
+    ]
+  },
+  "env": {
+    "staging": {
+      "name": "hogyhalad-background-staging",
+      "vars": {
+        "APP_URL": "https://staging.hogyhalad.hu",
+        "ENVIRONMENT": "staging",
+        "EMAIL_DOMAIN": "hogyhalad.hu",
+        "AUTH_FROM": "HogyHalad <belepes@hogyhalad.hu>",
+        "OPENAI_MODEL": "gpt-6-luna"
+      },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "hogyhalad-staging",
+          "database_id": "00000000-0000-0000-0000-000000000002",
+          "migrations_dir": "migrations"
+        }
+      ],
+      "r2_buckets": [
+        {
+          "binding": "FILES",
+          "bucket_name": "hogyhalad-staging-files"
+        }
+      ],
+      "queues": {
+        "producers": [
+          {
+            "binding": "TASKS",
+            "queue": "hogyhalad-staging-tasks"
+          }
+        ],
+        "consumers": [
+          {
+            "queue": "hogyhalad-staging-tasks",
+            "max_batch_size": 5,
+            "max_retries": 3,
+            "dead_letter_queue": "hogyhalad-staging-dlq"
+          }
+        ]
+      },
+      "triggers": {
+        "crons": ["* * * * *"]
+      }
+    },
+    "production": {
+      "name": "hogyhalad-background-production",
+      "vars": {
+        "APP_URL": "https://hogyhalad.hu",
+        "ENVIRONMENT": "production",
+        "EMAIL_DOMAIN": "hogyhalad.hu",
+        "AUTH_FROM": "HogyHalad <belepes@hogyhalad.hu>",
+        "OPENAI_MODEL": "gpt-6-luna"
+      },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "hogyhalad-production",
+          "database_id": "00000000-0000-0000-0000-000000000003",
+          "migrations_dir": "migrations"
+        }
+      ],
+      "r2_buckets": [
+        {
+          "binding": "FILES",
+          "bucket_name": "hogyhalad-production-files"
+        }
+      ],
+      "queues": {
+        "producers": [
+          {
+            "binding": "TASKS",
+            "queue": "hogyhalad-production-tasks"
+          }
+        ],
+        "consumers": [
+          {
+            "queue": "hogyhalad-production-tasks",
+            "max_batch_size": 5,
+            "max_retries": 3,
+            "dead_letter_queue": "hogyhalad-production-dlq"
+          }
+        ]
+      },
+      "triggers": {
+        "crons": ["* * * * *"]
+      }
+    }
+  },
+  "triggers": {
+    "crons": ["* * * * *"]
+  }
+}

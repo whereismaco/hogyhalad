@@ -1,0 +1,76 @@
+name: Verify and deploy
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Target environment
+        type: choice
+        options: [staging, production]
+        default: staging
+        required: true
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: node scripts/dev-setup.mjs
+      - run: npm run db:migrate
+      - run: npm run verify
+      - run: npm audit --omit=dev --audit-level=high
+      - run: npm run build:cloudflare
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
+      - run: npx wrangler deploy --config wrangler.background.jsonc --env staging --dry-run
+  deploy:
+    if: github.event_name == 'workflow_dispatch'
+    needs: verify
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+      D1_DATABASE_ID: ${{ vars.D1_DATABASE_ID }}
+      APP_URL: ${{ vars.APP_URL }}
+      EMAIL_DOMAIN: ${{ vars.EMAIL_DOMAIN }}
+      AUTH_FROM: ${{ vars.AUTH_FROM }}
+      TARGET_ENV: ${{ inputs.environment }}
+      LEGAL_DOCUMENTS_APPROVED: ${{ vars.LEGAL_DOCUMENTS_APPROVED }}
+      RUNTIME_SECRETS_JSON: ${{ secrets.RUNTIME_SECRETS_JSON }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: node scripts/configure-release.mjs "$TARGET_ENV"
+      - name: Validate release configuration without printing secrets
+        shell: bash
+        run: |
+          mkdir -p .wrangler
+          node --input-type=module <<'NODE'
+          import {writeFileSync} from 'node:fs';
+          import {execFileSync} from 'node:child_process';
+          const values=JSON.parse(process.env.RUNTIME_SECRETS_JSON||'{}');
+          execFileSync(process.execPath,['scripts/check-release.mjs',process.env.TARGET_ENV],{env:{...process.env,...values},stdio:'inherit'});
+          writeFileSync('.wrangler/runtime-secrets.json',JSON.stringify(values),{mode:0o600});
+          NODE
+      - run: npx wrangler secret bulk .wrangler/runtime-secrets.json --env "$TARGET_ENV"
+      - run: npx wrangler secret bulk .wrangler/runtime-secrets.json --config wrangler.background.jsonc --env "$TARGET_ENV"
+      - run: npx wrangler d1 migrations apply DB --remote --env "$TARGET_ENV"
+      - run: npm run build:cloudflare
+      - run: npx wrangler deploy --config wrangler.background.jsonc --env "$TARGET_ENV"
+      - run: npx opennextjs-cloudflare deploy --env "$TARGET_ENV"
+      - name: Remove temporary secrets file
+        if: always()
+        run: rm -f .wrangler/runtime-secrets.json

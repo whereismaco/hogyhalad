@@ -1,0 +1,2 @@
+ALTER TABLE invoiceRecords ADD COLUMN objectKey TEXT;
+ALTER TABLE tenants ADD COLUMN creditDebt INTEGER NOT NULL DEFAULT 0 CHECK(creditDebt>=0);
